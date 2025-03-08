@@ -67,7 +67,7 @@ class RevIndexedData(Data):
             return "{}(\n{}\n)".format(cls, ",\n".join(info))
         
 class RevIndexedDataset(Dataset):
-    def __init__(self, data_path):
+    def __init__(self, data_path, mean=None, std=None):
         super().__init__()
         with open(data_path, 'rb') as f:
             orig_list = pickle.load(f)
@@ -82,8 +82,12 @@ class RevIndexedDataset(Dataset):
             self.data_list.append(updated_sample)
         
         targets = np.array([self.data_list[i][-1][0] for i in range(len(self.data_list))])
-        self.target_mean = np.mean(targets)
-        self.target_std = np.std(targets)
+        self.target_mean = mean
+        self.target_std = std
+        if self.target_mean is None:
+            self.target_mean = np.mean(targets)
+        if self.target_std is None:
+            self.target_std = np.std(targets)
     
     def len(self):
         return len(self.data_list)

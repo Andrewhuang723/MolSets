@@ -20,9 +20,7 @@ This repository contains an implementation of the molecular graph deep sets (Mol
     Details on datasets:
   </summary>
   
-- `data_compiled.csv` contains cleaned raw data from the dataset curated in [*ACS Cent. Sci.* 2023, 9, 2, 206–216](https://doi.org/10.1021/acscentsci.2c01123).
-- `prepare_data.py` is for processing the raw data, e.g., converting SMILES to graphs.
-- `data_list.pkl` contains processed data from the dataset.
+- `data_list.pkl` contains processed data from the dataset curated in [*ACS Cent. Sci.* 2023, 9, 2, 206–216](https://doi.org/10.1021/acscentsci.2c01123).
   - An integer index;
   - A list of solvent molecular graphs in `torch_geometric.data.Data` format;
   - A list of solvent molecular weights (g/mol);
@@ -36,7 +34,7 @@ This repository contains an implementation of the molecular graph deep sets (Mol
   
 `results` provides model checkpoints and saves files generated in runs.
 
-*Note: [Git LFS](https://git-lfs.com/) is required to download the `.pkl` files properly. Please download them [here](https://drive.google.com/file/d/1Sjp4Idg7sEmwQcS8-2SVSXuDs1RAPrhw/view?usp=drive_link) if you do not have Git LFS.
+*Note: [Git LFS](https://git-lfs.com/) is required to download the `.pkl` files properly. Please download them manually if you do not have Git LFS.
 
 **Data handling is not yet optimized for efficiency. Contributions are welcome!
 

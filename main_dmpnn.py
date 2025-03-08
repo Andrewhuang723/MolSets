@@ -6,19 +6,21 @@ from dmpnn import MolSets_DMPNN
 from torch_geometric.data import Batch
 from torch_geometric.loader import DataLoader
 import random
+import json
+import time
 from scipy.stats import spearmanr, pearsonr
 from data_utils import  graph_set_collate, RevIndexedDataset
 
 hyperpars = {
     # Architecture
-    'hidden_dim': 32,
-    'emb_dim': 16,
-    'n_conv_layers': 3,
-    'after_readout': 'tanh',
+    'hidden_dim': 1024,
+    'emb_dim': 1024,
+    'n_conv_layers': 6,
+    'after_readout': 'norm',
     # Training
     'max_ep': 10000,
     'es_patience': 10,
-    'max_ep_wo_improv': 20,
+    'max_ep_wo_improv': 50,
     # Learning rate
     'lr': 0.001,
     'lrsch_patience': 10,
@@ -28,13 +30,13 @@ hyperpars = {
 }
 
 best_model = None
-SEED = 42
+SEED = 24
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 
-dataset = RevIndexedDataset('./data/data_list.pkl')
-train_data, val_data, test_data = random_split(dataset, (0.6, 0.2, 0.2))
+dataset = RevIndexedDataset('./data/data_list_v2.pkl')
+train_data, val_data, test_data = random_split(dataset, (0.8, 0.1, 0.1))
 train_loader = DataLoader(train_data, batch_size=32, shuffle=True)
 train_loader.collate_fn = graph_set_collate
 val_loader = DataLoader(val_data, batch_size=32, shuffle=True)
@@ -42,7 +44,7 @@ val_loader.collate_fn = graph_set_collate
 
 # Train model
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = MolSets_DMPNN(n_node_features=13, hidden_dim=hyperpars['hidden_dim'], emb_dim=hyperpars['emb_dim'], output_dim=1, n_conv_layers=hyperpars['n_conv_layers'], after_readout=hyperpars['after_readout']).to(device)
+model = MolSets_DMPNN(n_node_features=133, hidden_dim=hyperpars['hidden_dim'], emb_dim=hyperpars['emb_dim'], output_dim=1, n_conv_layers=hyperpars['n_conv_layers'], after_readout=hyperpars['after_readout']).to(device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=hyperpars['lr'], weight_decay=hyperpars['weight_decay'])
 scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=hyperpars['lrsch_factor'], patience=hyperpars['lrsch_patience'], verbose=True)
 loss_fn = torch.nn.MSELoss()
@@ -95,6 +97,7 @@ best_val_loss = np.inf
 epochs_wo_improv = 0
 print(f'Total params: {sum(param.numel() for param in model.parameters())}')
 
+start_time = time.time()
 # The training loop
 for epoch in range(hyperpars['max_ep']):
     train_loss = train(model, train_loader, optimizer, loss_fn)
@@ -106,6 +109,7 @@ for epoch in range(hyperpars['max_ep']):
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_model = model.state_dict()
+            print(f"Best Model current is at epoch: {epoch+1}")
             epochs_wo_improv = 0
         else:
             epochs_wo_improv += 1
@@ -114,22 +118,28 @@ for epoch in range(hyperpars['max_ep']):
             break
 
     print(f'Epoch {epoch+1}: Train Loss={train_loss:.5f}, Val Loss={val_loss:.5f}')
+end_time = time.time()
+elapsed_time = end_time - start_time
+print(f"Elapsed time: {elapsed_time} seconds")
 
 #%% Plots
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-mol_types = pd.read_pickle('./data/data_df_stats.pkl')['mol_type']
+mol_types = pd.read_pickle('./data/data_df_stats_v2.pkl')['mol_type']
 model_name = 'DMPNN_{}_h{}_e{}_reg{}_{}'.format(hyperpars['n_conv_layers'], hyperpars['hidden_dim'], hyperpars['emb_dim'], hyperpars['weight_decay'], hyperpars['after_readout'])
 
 targets = []
 predicted = []
 mol_labels = []
 mol_types_list = []
-
+checkpoint = {}
 if best_model is not None:
+    print(f"Save model to {model_name}.pt")
     model.load_state_dict(best_model)
-    torch.save(best_model, 'results/{}.pt'.format(model_name))
+    checkpoint["best_model"] = best_model
+    checkpoint["hyperparameters"] = hyperpars
+    torch.save(checkpoint, 'results/{}.pt'.format(model_name))
 
 model.eval()
 with torch.no_grad():

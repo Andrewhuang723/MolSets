@@ -28,13 +28,20 @@ class DMPNNEncoder(torch.nn.Module):
         
         self.fc = torch.nn.Linear(hidden_size, emb_dim) if input_type == 'nomw' else torch.nn.Linear(hidden_size+1, emb_dim)
         self.tanh = torch.nn.Tanh()
+        self.edge_features_num = edge_fdim
 
     def forward(self, data, logmw=None):
+        if self.edge_features_num > 1:
+            temp_edge_attr = data.edge_attr
+        else:
+            temp_edge_attr = data.edge_attr.unsqueeze(1)
+            
         x, edge_index, revedge_index, edge_attr, num_nodes, batch = (
             data.x,
             data.edge_index,
             data.revedge_index,
-            data.edge_attr.unsqueeze(1),
+            temp_edge_attr,
+            # data.edge_attr,
             data.num_nodes,
             data.batch,
         )
@@ -77,8 +84,10 @@ class MolSets_DMPNN(torch.nn.Module):
             case 'gelu': self.act = torch.nn.GELU()
             case 'lrelu': self.act = torch.nn.LeakyReLU()
             case _: raise NotImplementedError
-        self.phi = DMPNNEncoder(hidden_dim, emb_dim, n_node_features, edge_fdim=1, after_readout=after_readout, depth=n_conv_layers)
-        self.phi_salt = DMPNNEncoder(hidden_dim, emb_dim, n_node_features, edge_fdim=1, after_readout=after_readout, depth=n_conv_layers, input_type='nomw')
+        
+        ## Change edge_fdim if edge
+        self.phi = DMPNNEncoder(hidden_dim, emb_dim, n_node_features, edge_fdim=14, after_readout=after_readout, depth=n_conv_layers)
+        self.phi_salt = DMPNNEncoder(hidden_dim, emb_dim, n_node_features, edge_fdim=14, after_readout=after_readout, depth=n_conv_layers, input_type='nomw')
         self.att_q_net = torch.nn.Linear(emb_dim, 16)
         self.att_k_net = torch.nn.Linear(emb_dim, 16)
         self.att_v_net = torch.nn.Linear(emb_dim, emb_dim)
@@ -89,6 +98,10 @@ class MolSets_DMPNN(torch.nn.Module):
             self.act,
             torch.nn.Linear(hidden_dim, output_dim)
         )
+
+        # self.temp_emb = torch.nn.Sequential(
+        #     torch.nn.Linear(1, 1)
+        # )
 
     def forward(self, graph_list, mw, frac, salt_mol, salt_graph):
         log_mw = torch.log10(mw).unsqueeze(1)
@@ -104,6 +117,9 @@ class MolSets_DMPNN(torch.nn.Module):
         att_outputs = torch.matmul(torch.softmax(att_scores, dim=0), att_values) # n_graphs * emb_dim
         x = torch.matmul(frac, att_outputs).squeeze()
         # Representation of polymer mixture
+        # x = torch.cat((x, salt_embedding, salt_mol.unsqueeze(0), temp.unsqueeze(0)))
         x = torch.cat((x, salt_embedding, salt_mol.unsqueeze(0)))
         x = self.rho(x)
+        # t = self.temp_emb(temp.unsqueeze(0))
+        # x = torch.mul(x, t)
         return x

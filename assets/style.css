@@ -1,0 +1,13 @@
+body {
+    background-color: #121212; /* Dark gray background */
+    color: #E0E0E0; /* Light gray text */
+}
+
+.container {
+    padding: 20px;
+}
+
+/* Adjusting other elements as needed */
+h1, h2, h3, h4, h5, h6 {
+    color: #FFFFFF; /* White headings */
+}
